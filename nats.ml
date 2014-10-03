@@ -77,42 +77,84 @@ let sum_overflows (i1:int) (i2:int) : bool =
    and AlienNatFn, being careful to use the declarations and
    types specified in the problem set. *)
 
-module type IntNat : NATN = struct
+let append a b = List.fold_left (fun accum hd -> hd::accum) a b
+
+module IntNat : NATN = struct
   type t = int
+
+  exception Unrepresentable
+
+
   let zero = 0
   let one = 1
-  exception Unrepresentable
-  let ( + ) a b = 
-    try a + b with _-> raise Unrepresentable
-  let ( * ) a b =
-    try a * b with _-> raise Unrepresentable
-  let ( < ) a b = a<b
-  let ( === ) a b = a=b        
-  let int_of_nat n = n
-  let nat_of_int i = if i<0 then raise Unrepresentable else i
+  let ( + ) a b = if (sum_overflows a b) then raise Unrepresentable else a+b
+  let rec multiply a b result = match b with |0 -> result |_-> multiply a (b-1) (result + a)
+  let ( * ) a b = multiply a b 0
+  let ( < ) a b = a < b
+  let ( === ) a b = a==b 
+          
 
+  let int_of_nat n = try (n) with _-> raise Unrepresentable
+  let nat_of_int i = if(i<0)then raise Unrepresentable else i
 end
 
 
 
-module type ListNat : NATN = struct
+module ListNat : NATN = struct
   type t = int list
+
+  exception Unrepresentable
+
   let zero = []
   let one = [0]
-  exception Unrepresentable
-  let ( + ) a b = 
-    try a @ b with _-> raise Unrepresentable
-  let ( * ) a b = try List.fold_left ( fun acc b -> acc @ a) [] b with _-> raise Unrepresentable
-  let ( < ) a b = List.length(a) < List.length(b)
-  let ( === ) a b = List.length(a) < List.length(b)     
-  let rec keepAdding n list_so_far = match n==0 with
-       true  -> []
-     | false -> keepAdding (n-1) (list_so_far@[0])
-  let int_of_nat n =  length (n)
-  let nat_of_int i = if i>=0 then try keepAdding i [] with _-> raise Unrepresentable else Uraise nrepresentable
+  let ( + ) a b = try (append a b) with _-> raise Unrepresentable
+  let ( * ) a b = try (List.fold_left (fun accum b -> ( + ) accum a) [] b) with _ -> raise Unrepresentable
+  let ( < ) a b = (List.length a) < (List.length b)
+  let ( === ) a b = (List.length a) == (List.length b)
+  
+let rec keepAdding n list_so_far = match n==0 with 
+   true -> list_so_far
+  |false -> keepAdding (n-1) (0::list_so_far)        
 
+  let int_of_nat n = try List.length n with _-> raise Unrepresentable
+  let nat_of_int i = if(i>=0) then try keepAdding i [] with _-> raise Unrepresentable else raise Unrepresentable
 end
 
+module NatConvertFn ( N : NATN ) = struct
+let int_of_nat (n : N . t ): int = N.int_of_nat n
+let nat_of_int (n : int ): N . t = N.nat_of_int n
+end
 
+module AlienNatFn (M:AlienMapping) : NATN = struct
+  type t = M.aliensym list
+
+  exception Unrepresentable
+
+  let zero = [M.zero]
+  let one = [M.one]
+  let ( + ) a b = try (append a b) with _-> raise Unrepresentable
+  let ( * ) a b = try (List.fold_left (fun accum b -> accum+a) [] b)with _ -> raise Unrepresentable
+  (*0 == equal 1 == a smaller 2== b smaller*)
+  let rec compare_lst a b = match a,b with
+                        |h1::t1,h2::t2 -> let sub = h1-h2 in 
+                                            if sub>0 then compare (sub::t1) t2 
+                                            else if sub<0 then compare t1 (sub::t2) 
+                                            else compare t1 t2
+                        |[],[] -> 0 
+                        |h::t,[] -> 2
+                        |[], h::t -> 1
+
+  let to_intLst alst = List.fold_left (fun accum aliensym -> (M.int_of_aliensym aliensym)::accum) [] alst
+
+  let ( < ) a b = compare (to_intLst a) (to_intLst b) == 1
+  let ( === ) a b = compare (to_intLst a) (to_intLst b) == 0
+
+  let rec keepAddingAlien n list_so_far = match n==0 with 
+   true -> []
+  |false -> keepAddingAlien (n-1) (zero :: list_so_far)        
+
+  let int_of_nat n = try List.fold_left (fun accum b -> Pervasives.(+) accum (M.int_of_aliensym b)) 0 n with _-> raise Unrepresentable
+  let nat_of_int i = if(i>=0) then try keepAddingAlien i [] with _-> raise Unrepresentable else raise Unrepresentable
+end
 
 
